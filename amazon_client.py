@@ -11,15 +11,19 @@ if 'martyn' in os.environ.get('VIRTUAL_ENV', ''):
 def random_str(size=6, chars=string.ascii_lowercase):
    return ''.join(random.choice(chars) for _ in range(size))
 
-class Cloud_formation_client(object):
-   def __init__(self, name, filename, region='eu-west-1', bucket_name='cloudformation', on_failure='DELETE'):
+class Cloudformation(object):
+   def __init__(self, name, filename, region='eu-west-1', bucket_name='cloudformation', on_failure='DELETE', randomize_bucket=True):
       self.cf = boto3.client('cloudformation')
       self.s3 = boto3.client('s3')
       self.name = name 
       self.region = region
-      self.bucket_name = bucket_name + random_str()
+      if randomize_bucket:
+         self.bucket_name = bucket_name + random_str()
+      else:
+         self.bucket_name = bucket_name
       self.filename = filename
       self.on_failure = on_failure
+      self.upload_to_s3()
 
    def create_bucket(self, **kwargs):
       print 'Creating : {}'.format(self.bucket_name)
@@ -55,6 +59,5 @@ class Cloud_formation_client(object):
       self.cf.create_stack( **obj )
 
 if __name__ == "__main__":
-   c = Cloud_formation_client('test', 'file.json')
-   c.upload_to_s3()
+   c = Cloudformation('test', 'file.json')
    c.create_stack()
