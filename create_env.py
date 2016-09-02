@@ -3,7 +3,7 @@ from pprint import pprint
 import json
 import re
 import netaddr
-
+from amazon_client import Cloudformation
 
 class Environment(object):
 
@@ -309,6 +309,43 @@ class Environment(object):
                           SecurityGroups=security_groups,
                           **kwargs)
 
+    def add_loadbalancer(self, name, listeners, cross_zone=True, subnets=None, security_groups=None,  **kwargs):
+       subnets = [self.ref(s) for s in self.get_all("AWS::EC2::Subnet") ] if not subnets else [ self.ref(s) for s in subnets]
+       security_groups = [self.ref(s) for s in self.get_all(
+            "AWS::EC2::SecurityGroup")] if not security_groups else [self.ref(s) for s in security_groups]
+       vpc = self.get_first("AWS::EC2::VPC")
+       vpc_ref = self.ref(vpc)
+       required = {
+            "Listeners" : list
+       }
+
+       optional = {
+            "AccessLoggingPolicy" : dict,
+            "AppCookieStickinessPolicy" : list,
+            "AvailabilityZones" : list,
+            "ConnectionDrainingPolicy" : dict, 
+            "ConnectionSettings" : dict,
+            "CrossZone" : bool,
+            "HealthCheck" : dict,
+            "Instances" : list,
+            "LBCookieStickinessPolicy" : list ,
+            "LoadBalancerName" : str,
+            "Policies" : list, 
+            "Scheme" : str,
+            "SecurityGroups" : list, 
+            "Subnets" : list,
+            "Tags" : list 
+       }
+       self.add_resource(name,
+                       "AWS::ElasticLoadBalancing::LoadBalancer",
+                       required,
+                       optional,
+                       Listeners=listeners,
+                       CrossZone=cross_zone,
+                       depends=[ vpc ] + self.get_all("AWS::EC2::Subnet"),
+                       SecurityGroups=security_groups,
+                       Subnets=subnets)
+                        
     def add_autoscaling_group(self, name, max_size="1", min_size="0", subnets=None, instance=None, launch_config=None, **kwargs):
         subnets = [self.ref(s) for s in self.get_all(
             "AWS::EC2::Subnet")] if not subnets else [self.ref(s) for s in subnets]
@@ -327,7 +364,7 @@ class Environment(object):
             "HealthCheckType": str,
             "InstanceId": dict,
             "LaunchConfigurationName": dict,
-            "LoadBalancerNames": dict,
+            "LoadBalancerNames": list,
             "MetricsCollection": list,
             "NotificationConfigurations": list,
             "PlacementGroup": str,
@@ -368,7 +405,7 @@ class Environment(object):
     
     def write_resources(self, filename):
        with open(filename, 'w') as cf:
-          cf.write(json.dumps(self.show_resources))
+          cf.write(json.dumps(self.show_resources()))
 
 
 class SecurityGroupRules(object):
@@ -440,42 +477,32 @@ class Resource(object):
     def return_resource(self):
         return {"Type": self.type, "Properties": self.object}
 
-class Cloud_formation_client(object):
-   def __init__(self, name, bucket_name='cloudformation', file_name, on_failure='DELETE'):
-      self.cf = boto3.client('cloudformation')
-      self.s3 = boto3.resource('s3')
-      self.name = name
-      self.bucket_name = bucket_name
-      self.file_name = file_name
-      self.on_failure = on_failure
 
-   def create_bucket(self, **kwargs):
-      self.s3.create_bucket(
-         Bucket = self.bucket_name,
-         **kwargs
-      )
+class Listener(object):
+   def __init__(self, instance_port, loadbalancer_port, policy_names=None, ssl_certificate_id=None, inst_protocol='TCP', lb_protocol='TCP'):
+      self.instance_port = instance_port
+      self.loadbalancer_port = loadbalancer_port
+      self.policy_names = policy_names
+      self.ssl_certificate_id = ssl_certificate_id
+      self.lb_protocol = lb_protocol
+      self.inst_protocol = inst_protocol
+ 
+   def get_listener(self):
+      obj = {
+         "InstancePort" : str(self.instance_port),
+         "InstanceProtocol" : self.inst_protocol,
+         "LoadBalancerPort" : str(self.loadbalancer_port),
+         "Protocol" : self.lb_protocol
+      }
+      if self.policy_names and type(self.policy_names) == list:
+         obj["PolicyNames"] = self.policy_names
 
-   def upload_to_s3(self, **kwargs):
-      try:
-         with open(self.filename, 'r') as cf: 
-            self.s3.Bucket(self.bucket_name).put_object(
-               Key=self.filename, 
-               Body=cf,
-               **kwargs
-            )
-      except:
-         self.create_bucket()
-         self.upload_to_s3()   
-
-   def create_stack(self ):
-      self.cf.create_stack(
-         StackName = self.name,
-         TemplateURL = self.url,
-         Capabilities = ['CAPABILITY_IAM'],
-         OnFailure = self.on_failure
-      )
-
+      if self.ssl_certificate_id and type(self.ssl_certificate_id) == str:
+         obj["SSLCertificateId"] = self.ssl_certificate_id
+      return obj
+         
 if __name__ == "__main__":
+    filename = 'file.json'
     my_env = Environment()
     my_env.add_vpc("VPC")
     my_env.add_subnet("My first subnet", AvailabilityZone={
@@ -491,12 +518,21 @@ if __name__ == "__main__":
         "add second subnet", subnet="MySecondSubnet")
     in_rules = SecurityGroupRules("SecurityGroupIngress")
     in_rules.add_rule("tcp", from_port=22, to_port=22, cidr_ip="0.0.0.0/0")
+    in_rules.add_rule("tcp", from_port=80, to_port=80, cidr_ip="0.0.0.0/0")
     out_rules = SecurityGroupRules("SecurityGroupEgress")
     out_rules.add_rule("-1", cidr_ip="0.0.0.0/0")
     my_env.add_security_group(
         "My security group", in_rules.rules, out_rules.rules)
     my_env.add_launch_configuration(
-        "my launch configuration", "ami-64385917", "t2.micro")
-    my_env.add_autoscaling_group("my autoscaling group")
-    print json.dumps(my_env.show_resources())
-    my_env.write_resources('file.json')
+        "my launch configuration", "ami-64385917", "t2.micro", KeyName="id_rsa")
+    listener_80 = Listener(80, 80) 
+    listener_22 = Listener(22, 22) 
+    my_env.add_loadbalancer("My load balancer", [ l.get_listener() for l in (listener_80, listener_22) ] )
+    my_env.add_autoscaling_group("my autoscaling group", LoadBalancerNames=[my_env.ref("MyLoadBalancer")])
+    
+
+    #Launch stack
+    pprint(my_env.show_resources())
+    my_env.write_resources(filename)
+    my_client = Cloudformation('test2', filename)
+    my_client.create_stack()
