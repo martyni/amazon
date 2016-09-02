@@ -365,6 +365,10 @@ class Environment(object):
 
     def show_resources(self):
         return self.env
+    
+    def write_resources(self, filename):
+       with open(filename, 'w') as cf:
+          cf.write(json.dumps(self.show_resources))
 
 
 class SecurityGroupRules(object):
@@ -436,6 +440,40 @@ class Resource(object):
     def return_resource(self):
         return {"Type": self.type, "Properties": self.object}
 
+class Cloud_formation_client(object):
+   def __init__(self, name, bucket_name='cloudformation', file_name, on_failure='DELETE'):
+      self.cf = boto3.client('cloudformation')
+      self.s3 = boto3.resource('s3')
+      self.name = name
+      self.bucket_name = bucket_name
+      self.file_name = file_name
+      self.on_failure = on_failure
+
+   def create_bucket(self, **kwargs):
+      self.s3.create_bucket(
+         Bucket = self.bucket_name,
+         **kwargs
+      )
+
+   def upload_to_s3(self, **kwargs):
+      try:
+         with open(self.filename, 'r') as cf: 
+            self.s3.Bucket(self.bucket_name).put_object(
+               Key=self.filename, 
+               Body=cf,
+               **kwargs
+            )
+      except:
+         self.create_bucket()
+         self.upload_to_s3()   
+
+   def create_stack(self ):
+      self.cf.create_stack(
+         StackName = self.name,
+         TemplateURL = self.url,
+         Capabilities = ['CAPABILITY_IAM'],
+         OnFailure = self.on_failure
+      )
 
 if __name__ == "__main__":
     my_env = Environment()
@@ -461,3 +499,4 @@ if __name__ == "__main__":
         "my launch configuration", "ami-64385917", "t2.micro")
     my_env.add_autoscaling_group("my autoscaling group")
     print json.dumps(my_env.show_resources())
+    my_env.write_resources('file.json')
