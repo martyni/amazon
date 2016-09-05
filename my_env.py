@@ -27,7 +27,7 @@ if __name__ == "__main__":
     my_env.add_subnet_to_route_table(
         "add second subnet", subnet="MySecondSubnet")
     my_env.add_subnet_to_route_table(
-        "add second subnet", subnet="MyThirdSubnet")
+        "add third subnet", subnet="MyThirdSubnet")
     in_rules = SecurityGroupRules("SecurityGroupIngress")
     in_rules = SecurityGroupRules("SecurityGroupIngress")
     in_rules.add_rule("tcp", from_port=22, to_port=22, cidr_ip="0.0.0.0/0")
