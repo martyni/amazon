@@ -2,6 +2,7 @@ import os
 import boto3
 import string
 import random
+import datetime
 from pprint import pprint
 from fabric.api import local
 
@@ -11,6 +12,13 @@ if 'martyn' in os.environ.get('VIRTUAL_ENV', ''):
 def random_str(size=6, chars=string.ascii_lowercase):
    return ''.join(random.choice(chars) for _ in range(size))
 
+def date_str():
+   date_str = str(datetime.datetime.utcnow())
+   for c in " :-.":
+      date_str = date_str.replace(c, '')
+   
+   return date_str
+
 class Cloudformation(object):
    def __init__(self, name, filename, region='eu-west-1', bucket_name='cloudformation', on_failure='DELETE', randomize_bucket=True):
       self.cf = boto3.client('cloudformation')
@@ -18,7 +26,7 @@ class Cloudformation(object):
       self.name = name 
       self.region = region
       if randomize_bucket:
-         self.bucket_name = bucket_name + random_str()
+         self.bucket_name = bucket_name + date_str()
       else:
          self.bucket_name = bucket_name
       self.filename = filename
