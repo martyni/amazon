@@ -8,6 +8,8 @@ from helper import (
 )
 
 if __name__ == "__main__":
+    # Manually created key called id_rsa in amazon console
+    key_name = 'id_rsa' 
     filename = 'file.json'
     my_env = Environment()
     my_env.add_vpc("VPC")
@@ -35,16 +37,14 @@ if __name__ == "__main__":
     my_env.add_security_group(
         "My security group", in_rules.rules, out_rules.rules)
     my_env.add_launch_configuration(
-        "my launch configuration", "ami-64385917", "t2.micro", KeyName="id_rsa")
+        "my launch configuration", "ami-64385917", "t2.micro", KeyName=key_name)
     listener_80 = Listener(80, 80)
     listener_22 = Listener(22, 22)
     my_env.add_loadbalancer("My load balancer", [ l.get_listener() for l in (listener_80, listener_22) ] )
     my_env.add_autoscaling_group("my autoscaling group", LoadBalancerNames=[ my_env.ref("MyLoadBalancer") ])
-
 
     #Launch stack
     pprint(my_env.show_resources())
     my_env.write_resources(filename)
     my_client = Cloudformation('test', filename)
     my_client.create_stack()
-
