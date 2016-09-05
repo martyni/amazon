@@ -52,14 +52,20 @@ class Environment(object):
                 return resource[1]
         return False
 
-    def cf_join(self, join_list, deliminator=""):
-        return {"Fn::Join": [deliminator, join_list]}
-
-    def cf_availability_zones(self, zone):
-        return {"Fn::Select": [str(zone), {"Fn::GetAZs": {"Ref": "AWS::Region"}}]}
 
     def get_all(self, _type):
         return [resource[1] for resource in self.inventory_order if _type == resource[0]]
+
+    def describe(self, *args):
+        description = '_'.join([str(arg) for arg in args])
+        return re.sub(r'\W+', ' ', description)[:255:]
+
+    def show_resources(self):
+        return self.env
+    
+    def write_resources(self, filename):
+       with open(filename, 'w') as cf:
+          cf.write(json.dumps(self.show_resources()))
 
     def add_resource(self, name, _type, required, optional_keys, depends=None, **kwargs):
         name = name.title().replace(" ", "")
@@ -104,6 +110,26 @@ class Environment(object):
         }
         self.id = chr(ord(self.id) + 1)
 
+    def ref(self, key):
+        return {"Ref": key}
+
+    def cf_designer(self, _id, source, target):
+        self.env["Metadata"]["AWS::CloudFormation::Designer"][_id] = {
+            "source": {
+                "id": self.inventory[source]
+            },
+            "target": {
+                "id": self.inventory[target]
+            },
+            "z": self.counter()
+        }
+
+    def cf_join(self, join_list, deliminator=""):
+        return {"Fn::Join": [deliminator, join_list]}
+
+    def cf_availability_zones(self, zone):
+        return {"Fn::Select": [str(zone), {"Fn::GetAZs": {"Ref": "AWS::Region"}}]}
+
     def add_vpc(self, name, cidr_block="192.168.0.0/16", **kwargs):
         required_keys = {"CidrBlock": str}
         optional_keys = {
@@ -124,19 +150,6 @@ class Environment(object):
             self.network_generator = self.default_network.subnet(
                 self.subnet_default)
 
-    def ref(self, key):
-        return {"Ref": key}
-
-    def cloudformation_designer(self, _id, source, target):
-        self.env["Metadata"]["AWS::CloudFormation::Designer"][_id] = {
-            "source": {
-                "id": self.inventory[source]
-            },
-            "target": {
-                "id": self.inventory[target]
-            },
-            "z": self.counter()
-        }
 
     def add_subnet(self, name, vpc=None, cidr_block=None, **kwargs):
         vpc = self.get_first("AWS::EC2::VPC") if not vpc else vpc
@@ -176,7 +189,7 @@ class Environment(object):
             "InternetGatewayId": dict
         }
         optional = {}
-        self.cloudformation_designer(self.id, gateway, vpc)
+        self.cf_designer(self.id, gateway, vpc)
         gateway_ref = self.ref(gateway)
         vpc_ref = self.ref(vpc)
         self.add_resource(name,
@@ -400,15 +413,4 @@ class Environment(object):
                               InstanceId=self.ref(instance),
                               **kwargs
                               )
-
-    def describe(self, *args):
-        description = '_'.join([str(arg) for arg in args])
-        return re.sub(r'\W+', ' ', description)[:255:]
-
-    def show_resources(self):
-        return self.env
-    
-    def write_resources(self, filename):
-       with open(filename, 'w') as cf:
-          cf.write(json.dumps(self.show_resources()))
 
