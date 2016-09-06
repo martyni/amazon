@@ -59,7 +59,7 @@ class Cloudformation(object):
       obj = {
          'StackName' : self.name,
          'TemplateURL' : self.url,
-         'Capabilities' : ['CAPABILITY_IAM'],
+         'Capabilities' : ['CAPABILITY_NAMED_IAM'],
           'OnFailure' : self.on_failure
       }
       print 'Creating stack', 

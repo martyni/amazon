@@ -4,14 +4,16 @@ from amazon_client import Cloudformation
 from helper import (
    Listener,
    SecurityGroupRules,
-   Resource
+   Resource,
+   UserPolicy
 )
 
 if __name__ == "__main__":
     # Manually created key called id_rsa in amazon console
     key_name = 'id_rsa' 
     filename = 'file.json'
-    my_env = Environment()
+    stack_name = 'test'
+    my_env = Environment('my_env')
     my_env.add_vpc("VPC")
     my_env.add_subnet("My first subnet", AvailabilityZone={
                       "Fn::Select": ["1", {"Fn::GetAZs": {"Ref": "AWS::Region"}}]})
@@ -36,15 +38,29 @@ if __name__ == "__main__":
     out_rules.add_rule("-1", cidr_ip="0.0.0.0/0")
     my_env.add_security_group(
         "My security group", in_rules.rules, out_rules.rules)
+    docker_user = UserPolicy("docker")
+    docker_user.add_statement([
+        "ecr:*",
+        "ecs:CreateCluster",
+        "ecs:DeregisterContainerInstance",
+        "ecs:DiscoverPollEndpoint",
+        "ecs:Poll",
+        "ecs:RegisterContainerInstance",
+        "ecs:StartTelemetrySession",
+        "ecs:Submit*",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+    ])    
+    my_env.add_role("Dave", Policies=docker_user.policies)
+    my_env.add_instance_profile("Default")
     my_env.add_launch_configuration(
-        "my launch configuration", "ami-64385917", "t2.micro", KeyName=key_name)
+        "my launch configuration", "ami-64385917", "t2.micro", KeyName=key_name, IamInstanceProfile=my_env.ref("Default"))
     listener_80 = Listener(80, 80)
     listener_22 = Listener(22, 22)
     my_env.add_loadbalancer("My load balancer", [ l.get_listener() for l in (listener_80, listener_22) ] )
     my_env.add_autoscaling_group("my autoscaling group", LoadBalancerNames=[ my_env.ref("MyLoadBalancer") ])
-
     #Launch stack
     pprint(my_env.show_resources())
     my_env.write_resources(filename)
-    my_client = Cloudformation('test', filename)
+    my_client = Cloudformation(stack_name, filename)
     my_client.create_stack()

@@ -19,11 +19,16 @@ class Resource(object):
                     self.exception('{} required'.format(key))
 
             for key in kwargs:
-                self.object[key] = kwargs[key] if type(kwargs[key]) == self.keys["All"][key] else self.exception(
-                    '''{} is wrong format {} {}'''.format(key, type(kwargs[key]), self.keys["All"][key]))
+                try:
+                   self.object[key] = kwargs[key] if type(kwargs[key]) == self.keys["All"][key] else self.exception(
+                      '''{} is wrong format {} {}'''.format(key, type(kwargs[key]), self.keys["All"][key]))
+                except BaseException:
+                   if kwargs[key].get("Ref"):
+                      self.object[key] = kwargs[key]
 
     def return_resource(self):
-        return {"Type": self.type, "Properties": self.object}
+        self.resource = {"Type": self.type, "Properties": self.object}
+        return self.resource 
 
 class Listener(object):
    def __init__(self, instance_port, loadbalancer_port, policy_names=None, ssl_certificate_id=None, inst_protocol='TCP', lb_protocol='TCP'):
@@ -91,3 +96,26 @@ class SecurityGroupRules(object):
         self.rules.append({key: raw_rule[key]
                            for key in raw_rule if raw_rule[key]})
 
+class UserPolicy(object):
+
+   def __init__(self, name, version="2012-10-17"):
+      self.version = version
+      self.name = name
+      self.counter = 0
+      self.policies = []
+
+   def add_statement(self, rules):
+      statement = { 
+                  "PolicyName" : self.name + str(self.counter),
+                  "PolicyDocument": {
+                     "Version": self.version,
+                     "Statement": [ {
+                        "Action" : rules,
+                        "Effect" : "Allow",
+                        "Resource" : "*"
+                        }]
+                     }
+                  }
+      self.counter += 1
+      self.policies.append(statement)
+      

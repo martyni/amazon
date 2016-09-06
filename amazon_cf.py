@@ -3,6 +3,7 @@ from pprint import pprint
 import json
 import re
 import netaddr
+import os
 from amazon_client import Cloudformation
 from helper import (
    Listener,
@@ -15,11 +16,18 @@ class Environment(object):
     def exception(self, problem):
         raise BaseExeption(problem)
 
-    def __init__(self, version="2010-09-09", description='A default environment', subnet_default=24):
+    def __init__(self, name, version="2010-09-09", description='A default environment', subnet_default=24):
         self.version = version
         self.outputs = {}
         self.id = "a"
         self.count = 0
+        self.name = name
+        self.dir = os.path.dirname(os.path.realpath(__file__)) + '/{}'.format(self.name) 
+        try:
+           os.stat(self.dir)
+        except OSError:
+           os.mkdir(self.dir)
+    
         self.default_tags = [
             {"Key": "Application", "Value": self.ref("AWS::StackName")}
         ]
@@ -64,7 +72,7 @@ class Environment(object):
         return self.env
     
     def write_resources(self, filename):
-       with open(filename, 'w') as cf:
+       with open(filename, 'w+') as cf:
           cf.write(json.dumps(self.show_resources()))
 
     def add_resource(self, name, _type, required, optional_keys, depends=None, **kwargs):
@@ -108,6 +116,8 @@ class Environment(object):
                 "id": str(self.id)
             }
         }
+        with open('{}/{}.json'.format(self.name, name), "w") as template:
+           template.write(json.dumps(temp_resource.return_resource()))
         self.id = chr(ord(self.id) + 1)
 
     def ref(self, key):
@@ -317,11 +327,14 @@ class Environment(object):
             "SpotPrice": str,
             "UserData": dict
         }
+        depends = [vpc] 
+        if "depends" in kwargs:
+           depends += kwargs.pop("depends")
         self.add_resource(name,
                           "AWS::AutoScaling::LaunchConfiguration",
                           required,
                           optional,
-                          depends=[vpc],
+                          depends=depends,
                           ImageId=image,
                           InstanceType=instance_type,
                           SecurityGroups=security_groups,
@@ -414,3 +427,68 @@ class Environment(object):
                               **kwargs
                               )
 
+    def add_user(self, name, **kwargs):
+       required = {}
+       optional = {
+             "Groups": list,
+             "LoginProfile" : str,
+             "ManagedPolicyArns" : list,
+             "Path" : str,
+             "Policies" : list,
+             "UserName": str
+       }
+       self.add_resource(name,
+                         "AWS::IAM::User",
+                         required,
+                         optional,
+                         UserName=name,
+                         **kwargs
+                         )
+
+    def add_role(self, name, assume_policy=None, **kwargs):
+       required = {
+             "AssumeRolePolicyDocument": dict
+       }
+       optional = {
+             "RoleName": str,
+             "ManagedPolicyArns" : list,
+             "Path" : str,
+             "Policies" : list,
+             "UserName": str
+       }
+       if not assume_policy:
+           assume_policy =  {
+                  "Version" : "2012-10-17",
+                  "Statement": [ {
+                     "Effect": "Allow",
+                     "Principal": {
+                        "Service": [ "ec2.amazonaws.com" ]
+                     },
+                     "Action": [ "sts:AssumeRole" ]
+                  } ]
+               }
+          
+       self.add_resource(name,
+                         "AWS::IAM::Role",
+                         required,
+                         optional,
+                         RoleName=name,
+                         AssumeRolePolicyDocument=assume_policy,
+                         **kwargs
+                         )
+
+    def add_instance_profile(self, name, path="/", roles=None, **kwargs):
+        required = {
+           "Path": str,
+           "Roles": list
+        }
+        optional = {}
+        if not roles:
+           roles = [ self.ref(role) for role in self.get_all("AWS::IAM::Role") ]
+        self.add_resource(name,
+                         "AWS::IAM::InstanceProfile",
+                         required,
+                         optional,
+                         Path=path,
+                         Roles=roles 
+                         )
