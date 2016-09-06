@@ -6,10 +6,11 @@ import netaddr
 import os
 from amazon_client import Cloudformation
 from helper import (
-   Listener,
-   SecurityGroupRules,
-   Resource
+    Listener,
+    SecurityGroupRules,
+    Resource
 )
+
 
 class Environment(object):
 
@@ -22,12 +23,13 @@ class Environment(object):
         self.id = "a"
         self.count = 0
         self.name = name
-        self.dir = os.path.dirname(os.path.realpath(__file__)) + '/{}'.format(self.name) 
+        self.dir = os.path.dirname(os.path.realpath(
+            __file__)) + '/{}'.format(self.name)
         try:
-           os.stat(self.dir)
+            os.stat(self.dir)
         except OSError:
-           os.mkdir(self.dir)
-    
+            os.mkdir(self.dir)
+
         self.default_tags = [
             {"Key": "Application", "Value": self.ref("AWS::StackName")}
         ]
@@ -60,7 +62,6 @@ class Environment(object):
                 return resource[1]
         return False
 
-
     def get_all(self, _type):
         return [resource[1] for resource in self.inventory_order if _type == resource[0]]
 
@@ -70,10 +71,10 @@ class Environment(object):
 
     def show_resources(self):
         return self.env
-    
+
     def write_resources(self, filename):
-       with open(filename, 'w+') as cf:
-          cf.write(json.dumps(self.show_resources()))
+        with open(filename, 'w+') as cf:
+            cf.write(json.dumps(self.show_resources()))
 
     def add_resource(self, name, _type, required, optional_keys, depends=None, **kwargs):
         name = name.title().replace(" ", "")
@@ -117,7 +118,7 @@ class Environment(object):
             }
         }
         with open('{}/{}.json'.format(self.name, name), "w") as template:
-           template.write(json.dumps(temp_resource.return_resource()))
+            template.write(json.dumps(temp_resource.return_resource()))
         self.id = chr(ord(self.id) + 1)
 
     def ref(self, key):
@@ -159,7 +160,6 @@ class Environment(object):
             self.default_network = netaddr.IPNetwork(cidr_block)
             self.network_generator = self.default_network.subnet(
                 self.subnet_default)
-
 
     def add_subnet(self, name, vpc=None, cidr_block=None, **kwargs):
         vpc = self.get_first("AWS::EC2::VPC") if not vpc else vpc
@@ -327,9 +327,9 @@ class Environment(object):
             "SpotPrice": str,
             "UserData": dict
         }
-        depends = [vpc] 
+        depends = [vpc]
         if "depends" in kwargs:
-           depends += kwargs.pop("depends")
+            depends += kwargs.pop("depends")
         self.add_resource(name,
                           "AWS::AutoScaling::LaunchConfiguration",
                           required,
@@ -341,42 +341,43 @@ class Environment(object):
                           **kwargs)
 
     def add_loadbalancer(self, name, listeners, cross_zone=True, subnets=None, security_groups=None,  **kwargs):
-       subnets = [self.ref(s) for s in self.get_all("AWS::EC2::Subnet") ] if not subnets else [ self.ref(s) for s in subnets]
-       security_groups = [self.ref(s) for s in self.get_all(
+        subnets = [self.ref(s) for s in self.get_all(
+            "AWS::EC2::Subnet")] if not subnets else [self.ref(s) for s in subnets]
+        security_groups = [self.ref(s) for s in self.get_all(
             "AWS::EC2::SecurityGroup")] if not security_groups else [self.ref(s) for s in security_groups]
-       vpc = self.get_first("AWS::EC2::VPC")
-       vpc_ref = self.ref(vpc)
-       required = {
-            "Listeners" : list
-       }
+        vpc = self.get_first("AWS::EC2::VPC")
+        vpc_ref = self.ref(vpc)
+        required = {
+            "Listeners": list
+        }
 
-       optional = {
-            "AccessLoggingPolicy" : dict,
-            "AppCookieStickinessPolicy" : list,
-            "AvailabilityZones" : list,
-            "ConnectionDrainingPolicy" : dict, 
-            "ConnectionSettings" : dict,
-            "CrossZone" : bool,
-            "HealthCheck" : dict,
-            "Instances" : list,
-            "LBCookieStickinessPolicy" : list ,
-            "LoadBalancerName" : str,
-            "Policies" : list, 
-            "Scheme" : str,
-            "SecurityGroups" : list, 
-            "Subnets" : list,
-            "Tags" : list 
-       }
-       self.add_resource(name,
-                       "AWS::ElasticLoadBalancing::LoadBalancer",
-                       required,
-                       optional,
-                       Listeners=listeners,
-                       CrossZone=cross_zone,
-                       depends=[ vpc ] + self.get_all("AWS::EC2::Subnet"),
-                       SecurityGroups=security_groups,
-                       Subnets=subnets)
-                        
+        optional = {
+            "AccessLoggingPolicy": dict,
+            "AppCookieStickinessPolicy": list,
+            "AvailabilityZones": list,
+            "ConnectionDrainingPolicy": dict,
+            "ConnectionSettings": dict,
+            "CrossZone": bool,
+            "HealthCheck": dict,
+            "Instances": list,
+            "LBCookieStickinessPolicy": list,
+            "LoadBalancerName": str,
+            "Policies": list,
+            "Scheme": str,
+            "SecurityGroups": list,
+            "Subnets": list,
+            "Tags": list
+        }
+        self.add_resource(name,
+                          "AWS::ElasticLoadBalancing::LoadBalancer",
+                          required,
+                          optional,
+                          Listeners=listeners,
+                          CrossZone=cross_zone,
+                          depends=[vpc] + self.get_all("AWS::EC2::Subnet"),
+                          SecurityGroups=security_groups,
+                          Subnets=subnets)
+
     def add_autoscaling_group(self, name, max_size="1", min_size="0", subnets=None, instance=None, launch_config=None, **kwargs):
         subnets = [self.ref(s) for s in self.get_all(
             "AWS::EC2::Subnet")] if not subnets else [self.ref(s) for s in subnets]
@@ -428,67 +429,67 @@ class Environment(object):
                               )
 
     def add_user(self, name, **kwargs):
-       required = {}
-       optional = {
-             "Groups": list,
-             "LoginProfile" : str,
-             "ManagedPolicyArns" : list,
-             "Path" : str,
-             "Policies" : list,
-             "UserName": str
-       }
-       self.add_resource(name,
-                         "AWS::IAM::User",
-                         required,
-                         optional,
-                         UserName=name,
-                         **kwargs
-                         )
+        required = {}
+        optional = {
+            "Groups": list,
+            "LoginProfile": str,
+            "ManagedPolicyArns": list,
+            "Path": str,
+            "Policies": list,
+            "UserName": str
+        }
+        self.add_resource(name,
+                          "AWS::IAM::User",
+                          required,
+                          optional,
+                          UserName=name,
+                          **kwargs
+                          )
 
     def add_role(self, name, assume_policy=None, **kwargs):
-       required = {
-             "AssumeRolePolicyDocument": dict
-       }
-       optional = {
-             "RoleName": str,
-             "ManagedPolicyArns" : list,
-             "Path" : str,
-             "Policies" : list,
-             "UserName": str
-       }
-       if not assume_policy:
-           assume_policy =  {
-                  "Version" : "2012-10-17",
-                  "Statement": [ {
-                     "Effect": "Allow",
-                     "Principal": {
-                        "Service": [ "ec2.amazonaws.com" ]
-                     },
-                     "Action": [ "sts:AssumeRole" ]
-                  } ]
-               }
-          
-       self.add_resource(name,
-                         "AWS::IAM::Role",
-                         required,
-                         optional,
-                         RoleName=name,
-                         AssumeRolePolicyDocument=assume_policy,
-                         **kwargs
-                         )
+        required = {
+            "AssumeRolePolicyDocument": dict
+        }
+        optional = {
+            "RoleName": str,
+            "ManagedPolicyArns": list,
+            "Path": str,
+            "Policies": list,
+            "UserName": str
+        }
+        if not assume_policy:
+            assume_policy = {
+                "Version": "2012-10-17",
+                "Statement": [{
+                    "Effect": "Allow",
+                    "Principal": {
+                           "Service": ["ec2.amazonaws.com"]
+                    },
+                    "Action": ["sts:AssumeRole"]
+                }]
+            }
+
+        self.add_resource(name,
+                          "AWS::IAM::Role",
+                          required,
+                          optional,
+                          RoleName=name,
+                          AssumeRolePolicyDocument=assume_policy,
+                          **kwargs
+                          )
 
     def add_instance_profile(self, name, path="/", roles=None, **kwargs):
         required = {
-           "Path": str,
-           "Roles": list
+            "Path": str,
+            "Roles": list
         }
         optional = {}
         if not roles:
-           roles = [ self.ref(role) for role in self.get_all("AWS::IAM::Role") ]
+            roles = [self.ref(role) for role in self.get_all("AWS::IAM::Role")]
         self.add_resource(name,
-                         "AWS::IAM::InstanceProfile",
-                         required,
-                         optional,
-                         Path=path,
-                         Roles=roles 
-                         )
+                          "AWS::IAM::InstanceProfile",
+                          required,
+                          optional,
+                          Path=path,
+                          Roles=roles
+                          )
