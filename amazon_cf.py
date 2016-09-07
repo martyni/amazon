@@ -46,7 +46,6 @@ class Environment(object):
         self.inventory_order = []
         self.inventory = {}
 
-
     def counter(self):
         '''Keeps track of the number of resources'''
         self.count += 1
@@ -174,7 +173,6 @@ class Environment(object):
             self.network_generator = self.default_network.subnet(
                 self.subnet_default)
 
-
     def add_subnet(self, name, vpc=None, cidr_block=None, **kwargs):
         vpc = self.get_first("AWS::EC2::VPC") if not vpc else vpc
         cidr_block = self.get_next_subnet() if not cidr_block else cidr_block
@@ -230,7 +228,7 @@ class Environment(object):
 
     def add_route_table(self, name, vpc=None, attached=None):
         vpc = self.cf_ref(self.get_first("AWS::EC2::VPC")
-                       ) if not vpc else self.cf_ref(vpc)
+                          ) if not vpc else self.cf_ref(vpc)
         required = {"VpcId": dict}
         optional = {"Tags": list}
         attached = self.get_first(
@@ -427,7 +425,8 @@ class Environment(object):
                               MaxSize=max_size,
                               MinSize=min_size,
                               VPCZoneIdentifier=subnets,
-                              LaunchConfigurationName=self.cf_ref(launch_config),
+                              LaunchConfigurationName=self.cf_ref(
+                                  launch_config),
                               **kwargs
                               )
         elif instances:
@@ -499,7 +498,8 @@ class Environment(object):
         }
         optional = {}
         if not roles:
-            roles = [self.cf_ref(role) for role in self.get_all("AWS::IAM::Role")]
+            roles = [self.cf_ref(role)
+                     for role in self.get_all("AWS::IAM::Role")]
         self.add_resource(name,
                           "AWS::IAM::InstanceProfile",
                           required,
@@ -507,12 +507,12 @@ class Environment(object):
                           Path=path,
                           Roles=roles
                           )
-    
-    def add_ecs_task(self, name, container_definitions=[], volumes=[] ):
-        required = { 
-                    "ContainerDefinitions": list,
-                    "Volumes": list
-                   }
+
+    def add_ecs_task(self, name, container_definitions=[], volumes=[]):
+        required = {
+            "ContainerDefinitions": list,
+            "Volumes": list
+        }
         optional = {}
         self.add_resource(name,
                           "AWS::ECS::TaskDefinition",
@@ -520,21 +520,22 @@ class Environment(object):
                           optional,
                           ContainerDefinitions=container_definitions,
                           Volumes=volumes
-                         ) 
+                          )
 
     def add_ecs_service(self, name, desired_count=None, task_definition=None,  **kwargs):
         if desired_count:
-           desired_count = str(desired_count)
+            desired_count = str(desired_count)
         else:
-           desired_count = "1"
-        task_definition = self.cf_ref(task_definition) if task_definition else self.cf_ref(self.get_first("AWS::ECS::TaskDefinition"))
-        required = { 
-            "DesiredCount" : str,
-            "TaskDefinition" : str
-        } 
+            desired_count = "1"
+        task_definition = self.cf_ref(task_definition) if task_definition else self.cf_ref(
+            self.get_first("AWS::ECS::TaskDefinition"))
+        required = {
+            "DesiredCount": str,
+            "TaskDefinition": str
+        }
         optional = {
-            "Cluster" : str,
-            "DeploymentConfiguration" : dict,
+            "Cluster": str,
+            "DeploymentConfiguration": dict,
             "LoadBalancers": list,
             "Role": str
         }
