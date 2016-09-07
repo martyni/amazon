@@ -15,9 +15,11 @@ from helper import (
 class Environment(object):
 
     def exception(self, problem):
+        '''base exception method'''
         raise BaseExeption(problem)
 
     def __init__(self, name, version="2010-09-09", description='A default environment', subnet_default=24):
+        '''Class for creating Amazon Cloudformation templates with minimal overhead'''
         self.version = version
         self.outputs = {}
         self.id = "a"
@@ -31,7 +33,7 @@ class Environment(object):
             os.mkdir(self.dir)
 
         self.default_tags = [
-            {"Key": "Application", "Value": self.ref("AWS::StackName")}
+            {"Key": "Application", "Value": self.cf_ref("AWS::StackName")}
         ]
         self.description = description
         self.default_network = False
@@ -46,37 +48,70 @@ class Environment(object):
         self.inventory_order = []
         self.inventory = {}
 
-    def add_outputs(self, name, description='', target=None):
-        self.env["Outputs"][name] = {
-            "Value": self.ref(name),
-            "Description": description
-        }
 
     def counter(self):
+        '''Keeps track of the number of resources'''
         self.count += 1
         return self.count
 
     def get_first(self, _type):
+        '''Gets first resources of type _type. Environment knows what order resources are added within the script so this will be the first resource created in the script'''
         for resource in self.inventory_order:
             if _type == resource[0]:
                 return resource[1]
         return False
 
     def get_all(self, _type):
+        '''Gets a list of all the resources of type _type.'''
         return [resource[1] for resource in self.inventory_order if _type == resource[0]]
 
     def describe(self, *args):
+        '''Returns a formatted string given arbitrary args'''
         description = '_'.join([str(arg) for arg in args])
         return re.sub(r'\W+', ' ', description)[:255:]
 
     def show_resources(self):
+        '''Shows all the resources'''
         return self.env
 
     def write_resources(self, filename):
+        '''Writes cloudformation object to file'''
         with open(filename, 'w+') as cf:
             cf.write(json.dumps(self.show_resources()))
 
+    def cf_ref(self, key)e
+        '''Cloudformation referential function'''
+        return {"Ref": key}
+
+    def cf_designer(self, _id, source, target):
+        '''Implements the Cloudformation Designer. This was used for debugging and hasn't been fully implemented'''
+        self.env["Metadata"]["AWS::CloudFormation::Designer"][_id] = {
+            "source": {
+                "id": self.inventory[source]
+            },
+            "target": {
+                "id": self.inventory[target]
+            },
+            "z": self.counter()
+        }
+
+    def cf_join(self, join_list, deliminator=""):
+        '''Join function'''
+        return {"Fn::Join": [deliminator, join_list]}
+
+    def cf_availability_zones(self, zone):
+        '''Availability zone function'''
+        return {"Fn::Select": [str(zone), {"Fn::GetAZs": {"Ref": "AWS::Region"}}]}
+
+    def add_outputs(self, name, description='', target=None):
+        '''Method to add output for resource'''
+        self.env["Outputs"][name] = {
+            "Value": self.cf_ref(name),
+            "Description": description
+        }
+
     def add_resource(self, name, _type, required, optional_keys, depends=None, **kwargs):
+        '''Generic method for adding a resource to the Cloud formation template. Makes use of the Resource helper object'''
         name = name.title().replace(" ", "")
         self.add_outputs(name)
         if _type == "AWS::AutoScaling::AutoScalingGroup":
@@ -84,7 +119,7 @@ class Environment(object):
                                      required,
                                      optional_keys,
                                      Tags=[{"Key": "Name", "Value": self.cf_join(
-                                         [self.ref("AWS::StackName"), name]), "PropagateAtLaunch":True}],
+                                         [self.cf_ref("AWS::StackName"), name]), "PropagateAtLaunch":True}],
                                      **kwargs)
         elif "Tags" in optional_keys and "Tags" not in kwargs:
             temp_resource = Resource(_type,
@@ -92,7 +127,7 @@ class Environment(object):
                                      optional_keys,
                                      Tags=self.default_tags +
                                      [{"Key": "Name", "Value": self.cf_join(
-                                         [self.ref("AWS::StackName"), name])}],
+                                         [self.cf_ref("AWS::StackName"), name])}],
                                      **kwargs)
         elif "Tags" in optional_keys:
             temp_resource = Resource(_type,
@@ -121,26 +156,6 @@ class Environment(object):
             template.write(json.dumps(temp_resource.return_resource()))
         self.id = chr(ord(self.id) + 1)
 
-    def ref(self, key):
-        return {"Ref": key}
-
-    def cf_designer(self, _id, source, target):
-        self.env["Metadata"]["AWS::CloudFormation::Designer"][_id] = {
-            "source": {
-                "id": self.inventory[source]
-            },
-            "target": {
-                "id": self.inventory[target]
-            },
-            "z": self.counter()
-        }
-
-    def cf_join(self, join_list, deliminator=""):
-        return {"Fn::Join": [deliminator, join_list]}
-
-    def cf_availability_zones(self, zone):
-        return {"Fn::Select": [str(zone), {"Fn::GetAZs": {"Ref": "AWS::Region"}}]}
-
     def add_vpc(self, name, cidr_block="192.168.0.0/16", **kwargs):
         required_keys = {"CidrBlock": str}
         optional_keys = {
@@ -161,6 +176,7 @@ class Environment(object):
             self.network_generator = self.default_network.subnet(
                 self.subnet_default)
 
+
     def add_subnet(self, name, vpc=None, cidr_block=None, **kwargs):
         vpc = self.get_first("AWS::EC2::VPC") if not vpc else vpc
         cidr_block = self.get_next_subnet() if not cidr_block else cidr_block
@@ -177,7 +193,7 @@ class Environment(object):
                           "AWS::EC2::Subnet",
                           required_keys,
                           optional_keys,
-                          VpcId=self.ref(vpc),
+                          VpcId=self.cf_ref(vpc),
                           CidrBlock=cidr_block,
                           **kwargs
                           )
@@ -200,8 +216,8 @@ class Environment(object):
         }
         optional = {}
         self.cf_designer(self.id, gateway, vpc)
-        gateway_ref = self.ref(gateway)
-        vpc_ref = self.ref(vpc)
+        gateway_ref = self.cf_ref(gateway)
+        vpc_ref = self.cf_ref(vpc)
         self.add_resource(name,
                           "AWS::EC2::VPCGatewayAttachment",
                           required,
@@ -215,8 +231,8 @@ class Environment(object):
             return str(self.network_generator.next())
 
     def add_route_table(self, name, vpc=None, attached=None):
-        vpc = self.ref(self.get_first("AWS::EC2::VPC")
-                       ) if not vpc else self.ref(vpc)
+        vpc = self.cf_ref(self.get_first("AWS::EC2::VPC")
+                       ) if not vpc else self.cf_ref(vpc)
         required = {"VpcId": dict}
         optional = {"Tags": list}
         attached = self.get_first(
@@ -231,7 +247,7 @@ class Environment(object):
     def add_route(self, name, cidr_block, route_table=None, depends=[],  **kwargs):
         route_table = self.get_first(
             "AWS::EC2::RouteTable") if not route_table else route_table
-        route_table = self.ref(route_table)
+        route_table = self.cf_ref(route_table)
         required = {
             "DestinationCidrBlock": str,
             "RouteTableId": dict
@@ -255,15 +271,15 @@ class Environment(object):
 
     def add_default_internet_route(self, name):
         depends = [self.get_first("AWS::EC2::VPCGatewayAttachment")]
-        gateway = self.ref(self.get_first("AWS::EC2::InternetGateway"))
+        gateway = self.cf_ref(self.get_first("AWS::EC2::InternetGateway"))
         self.add_route(name, "0.0.0.0/0", depends=depends, GatewayId=gateway)
 
     def add_subnet_to_route_table(self, name, subnet=None, route_table=None):
         subnet = self.get_first("AWS::EC2::Subnet") if not subnet else subnet
         route_table = self.get_first(
             "AWS::EC2::RouteTable") if not route_table else route_table
-        subnet_ref = self.ref(subnet)
-        route_table_ref = self.ref(route_table)
+        subnet_ref = self.cf_ref(subnet)
+        route_table_ref = self.cf_ref(route_table)
         required = {
             "RouteTableId": dict,
             "SubnetId": dict
@@ -280,7 +296,7 @@ class Environment(object):
 
     def add_security_group(self, name, ingress, egress, vpc=None, **kwargs):
         vpc = self.get_first("AWS::EC2::VPC") if not vpc else vpc
-        vpc_ref = self.ref(vpc)
+        vpc_ref = self.cf_ref(vpc)
 
         required = {
             "GroupDescription": str,
@@ -303,9 +319,9 @@ class Environment(object):
 
     def add_launch_configuration(self, name, image, instance_type, vpc=None, security_groups=None, **kwargs):
         vpc = self.get_first("AWS::EC2::VPC") if not vpc else vpc
-        security_groups = [self.ref(s) for s in self.get_all(
-            "AWS::EC2::SecurityGroup")] if not security_groups else [self.ref(s) for s in security_groups]
-        vpc_ref = self.ref(vpc)
+        security_groups = [self.cf_ref(s) for s in self.get_all(
+            "AWS::EC2::SecurityGroup")] if not security_groups else [self.cf_ref(s) for s in security_groups]
+        vpc_ref = self.cf_ref(vpc)
         required = {
             "ImageId": str,
             "InstanceType": str
@@ -341,12 +357,12 @@ class Environment(object):
                           **kwargs)
 
     def add_loadbalancer(self, name, listeners, cross_zone=True, subnets=None, security_groups=None,  **kwargs):
-        subnets = [self.ref(s) for s in self.get_all(
-            "AWS::EC2::Subnet")] if not subnets else [self.ref(s) for s in subnets]
-        security_groups = [self.ref(s) for s in self.get_all(
-            "AWS::EC2::SecurityGroup")] if not security_groups else [self.ref(s) for s in security_groups]
+        subnets = [self.cf_ref(s) for s in self.get_all(
+            "AWS::EC2::Subnet")] if not subnets else [self.cf_ref(s) for s in subnets]
+        security_groups = [self.cf_ref(s) for s in self.get_all(
+            "AWS::EC2::SecurityGroup")] if not security_groups else [self.cf_ref(s) for s in security_groups]
         vpc = self.get_first("AWS::EC2::VPC")
-        vpc_ref = self.ref(vpc)
+        vpc_ref = self.cf_ref(vpc)
         required = {
             "Listeners": list
         }
@@ -379,8 +395,8 @@ class Environment(object):
                           Subnets=subnets)
 
     def add_autoscaling_group(self, name, max_size="1", min_size="0", subnets=None, instance=None, launch_config=None, **kwargs):
-        subnets = [self.ref(s) for s in self.get_all(
-            "AWS::EC2::Subnet")] if not subnets else [self.ref(s) for s in subnets]
+        subnets = [self.cf_ref(s) for s in self.get_all(
+            "AWS::EC2::Subnet")] if not subnets else [self.cf_ref(s) for s in subnets]
         if not instance:
             launch_config = self.get_first(
                 "AWS::AutoScaling::LaunchConfiguration") if not launch_config else launch_config
@@ -413,7 +429,7 @@ class Environment(object):
                               MaxSize=max_size,
                               MinSize=min_size,
                               VPCZoneIdentifier=subnets,
-                              LaunchConfigurationName=self.ref(launch_config),
+                              LaunchConfigurationName=self.cf_ref(launch_config),
                               **kwargs
                               )
         elif instances:
@@ -424,7 +440,7 @@ class Environment(object):
                               MaxSize=max_size,
                               MinSize=min_size,
                               VPCZoneIdentifier=subnets,
-                              InstanceId=self.ref(instance),
+                              InstanceId=self.cf_ref(instance),
                               **kwargs
                               )
 
@@ -485,7 +501,7 @@ class Environment(object):
         }
         optional = {}
         if not roles:
-            roles = [self.ref(role) for role in self.get_all("AWS::IAM::Role")]
+            roles = [self.cf_ref(role) for role in self.get_all("AWS::IAM::Role")]
         self.add_resource(name,
                           "AWS::IAM::InstanceProfile",
                           required,

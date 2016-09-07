@@ -13,6 +13,8 @@ if __name__ == "__main__":
     key_name = 'id_rsa'
     filename = 'file.json'
     stack_name = 'test'
+    server_size = "t2.micro"
+    ami = "ami-64385917"
     my_env = Environment('my_env')
     my_env.add_vpc("VPC")
     my_env.add_subnet("My first subnet", AvailabilityZone={
@@ -54,12 +56,12 @@ if __name__ == "__main__":
     my_env.add_role("DefaultUser", Policies=docker_user.policies)
     my_env.add_instance_profile("Default")
     my_env.add_launch_configuration(
-        "my launch configuration", "ami-64385917", "t2.micro", KeyName=key_name, IamInstanceProfile=my_env.ref("Default"))
+        "my launch configuration", ami, server_size, KeyName=key_name, AssociatePublicIpAddress=True, IamInstanceProfile=my_env.ref("Default"))
     listener_80 = Listener(80, 80)
     listener_22 = Listener(22, 22)
     my_env.add_loadbalancer("My load balancer", [
                             l.get_listener() for l in (listener_80, listener_22)])
-    my_env.add_autoscaling_group("my autoscaling group", LoadBalancerNames=[
+    my_env.add_autoscaling_group("my autoscaling group", DesiredCapacity="1", LoadBalancerNames=[
                                  my_env.ref("MyLoadBalancer")])
     # Launch stack
     pprint(my_env.show_resources())
