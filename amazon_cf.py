@@ -6,8 +6,6 @@ import netaddr
 import os
 from amazon_client import Cloudformation
 from helper import (
-    Listener,
-    SecurityGroupRules,
     Resource
 )
 
@@ -79,7 +77,7 @@ class Environment(object):
         with open(filename, 'w+') as cf:
             cf.write(json.dumps(self.show_resources()))
 
-    def cf_ref(self, key)e
+    def cf_ref(self, key):
         '''Cloudformation referential function'''
         return {"Ref": key}
 
@@ -508,4 +506,42 @@ class Environment(object):
                           optional,
                           Path=path,
                           Roles=roles
+                          )
+    
+    def add_ecs_task(self, name, container_definitions=[], volumes=[] ):
+        required = { 
+                    "ContainerDefinitions": list,
+                    "Volumes": list
+                   }
+        optional = {}
+        self.add_resource(name,
+                          "AWS::ECS::TaskDefinition",
+                          required,
+                          optional,
+                          ContainerDefinitions=container_definitions,
+                          Volumes=volumes
+                         ) 
+
+    def add_ecs_service(self, name, desired_count=None, task_definition=None,  **kwargs):
+        if desired_count:
+           desired_count = str(desired_count)
+        else:
+           desired_count = "1"
+        task_definition = self.cf_ref(task_definition) if task_definition else self.cf_ref(self.get_first("AWS::ECS::TaskDefinition"))
+        required = { 
+            "DesiredCount" : str,
+            "TaskDefinition" : str
+        } 
+        optional = {
+            "Cluster" : str,
+            "DeploymentConfiguration" : dict,
+            "LoadBalancers": list,
+            "Role": str
+        }
+        self.add_resource(name,
+                          "AWS::ECS::Service",
+                          required,
+                          optional,
+                          DesiredCount=desired_count,
+                          TaskDefinition=task_definition
                           )

@@ -4,8 +4,9 @@ from amazon_client import Cloudformation
 from helper import (
     Listener,
     SecurityGroupRules,
-    Resource,
-    UserPolicy
+    UserPolicy,
+    get_my_ip,
+    ContainerDefinition
 )
 
 if __name__ == "__main__":
@@ -15,6 +16,7 @@ if __name__ == "__main__":
     stack_name = 'test'
     server_size = "t2.micro"
     ami = "ami-64385917"
+    my_ip = get_my_ip()
     my_env = Environment('my_env')
     my_env.add_vpc("VPC")
     my_env.add_subnet("My first subnet", AvailabilityZone={
@@ -33,8 +35,7 @@ if __name__ == "__main__":
     my_env.add_subnet_to_route_table(
         "add third subnet", subnet="MyThirdSubnet")
     in_rules = SecurityGroupRules("SecurityGroupIngress")
-    in_rules = SecurityGroupRules("SecurityGroupIngress")
-    in_rules.add_rule("tcp", from_port=22, to_port=22, cidr_ip="0.0.0.0/0")
+    in_rules.add_rule("tcp", from_port=22, to_port=22, cidr_ip=my_ip)
     in_rules.add_rule("tcp", from_port=80, to_port=80, cidr_ip="0.0.0.0/0")
     out_rules = SecurityGroupRules("SecurityGroupEgress")
     out_rules.add_rule("-1", cidr_ip="0.0.0.0/0")
@@ -53,16 +54,32 @@ if __name__ == "__main__":
         "logs:CreateLogStream",
         "logs:PutLogEvents"
     ])
-    my_env.add_role("DefaultUser", Policies=docker_user.policies)
-    my_env.add_instance_profile("Default")
+    my_env.add_role("MytUser", Policies=docker_user.policies)
+    my_env.add_instance_profile("My profile")
     my_env.add_launch_configuration(
-        "my launch configuration", ami, server_size, KeyName=key_name, AssociatePublicIpAddress=True, IamInstanceProfile=my_env.ref("Default"))
+        "my launch configuration", ami, server_size, KeyName=key_name, AssociatePublicIpAddress=True, IamInstanceProfile=my_env.cf_ref("MyProfile"))
     listener_80 = Listener(80, 80)
-    listener_22 = Listener(22, 22)
-    my_env.add_loadbalancer("My load balancer", [
-                            l.get_listener() for l in (listener_80, listener_22)])
-    my_env.add_autoscaling_group("my autoscaling group", DesiredCapacity="1", LoadBalancerNames=[
-                                 my_env.ref("MyLoadBalancer")])
+    my_env.add_loadbalancer("My Load Balancer", [ listener_80.get_listener() ])
+    my_env.add_autoscaling_group("My Autoscaling Group", DesiredCapacity="1", LoadBalancerNames=[
+                                 my_env.cf_ref("MyLoadBalancer")])
+    container_kwargs = {
+                "Name": "httpd",
+                "Image": "httpd",
+                "Cpu": 1,
+                "PortMappings": [
+                    {
+                        "Protocol": "tcp",
+                        "ContainerPort": 80,
+                        "HostPort": 80
+                    }
+                ],
+                "Memory": 128,
+                "Essential": True
+            }
+    my_container = ContainerDefinition(**container_kwargs)
+    my_env.add_ecs_task( 'web service', container_definitions=[ my_container.return_container() ] )
+    my_env.add_ecs_service('web service running')
+
     # Launch stack
     pprint(my_env.show_resources())
     my_env.write_resources(filename)

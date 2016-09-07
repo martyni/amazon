@@ -1,8 +1,10 @@
+import requests
 
-class Resource(object):
-
+class BaseHelper(object):
     def exception(self, problem):
         raise BaseException(problem)
+
+class Resource(BaseHelper):
 
     def __init__(self, _type, required_keys, optional_keys,  **kwargs):
         self.type = _type
@@ -20,17 +22,20 @@ class Resource(object):
 
             for key in kwargs:
                 try:
-                   self.object[key] = kwargs[key] if type(kwargs[key]) == self.keys["All"][key] else self.exception(
-                      '''{} is wrong format {} {}'''.format(key, type(kwargs[key]), self.keys["All"][key]))
+                   self.object[key] = kwargs[key] if type(kwargs[key]) == self.keys["All"][key] else self.exception('')
                 except BaseException:
-                   if kwargs[key].get("Ref"):
-                      self.object[key] = kwargs[key]
+                   try:
+                      if kwargs[key].get("Ref"):
+                         self.object[key] = kwargs[key]
+                   except:
+                      self.exception(
+                      '''{} is wrong format {} {}'''.format(key, type(kwargs[key]), self.keys["All"][key]))
 
     def return_resource(self):
         self.resource = {"Type": self.type, "Properties": self.object}
         return self.resource 
 
-class Listener(object):
+class Listener(BaseHelper):
    def __init__(self, instance_port, loadbalancer_port, policy_names=None, ssl_certificate_id=None, inst_protocol='TCP', lb_protocol='TCP'):
       self.instance_port = instance_port
       self.loadbalancer_port = loadbalancer_port
@@ -54,10 +59,7 @@ class Listener(object):
       return obj
 
 
-class SecurityGroupRules(object):
-
-    def exception(self, problem):
-        raise BaseException(problem)
+class SecurityGroupRules(BaseHelper):
 
     def __init__(self, _type):
         self.type = _type
@@ -96,7 +98,7 @@ class SecurityGroupRules(object):
         self.rules.append({key: raw_rule[key]
                            for key in raw_rule if raw_rule[key]})
 
-class UserPolicy(object):
+class UserPolicy(BaseHelper):
 
    def __init__(self, name, version="2012-10-17"):
       self.version = version
@@ -118,4 +120,40 @@ class UserPolicy(object):
                   }
       self.counter += 1
       self.policies.append(statement)
+   
+class ContainerDefinition(BaseHelper):
+   def __init__(self, **kwargs):
+      self.strings = [ "Name", "Image", "Hostname", "User", "WorkingDirectory"]
+      self.ints = [ "Cpu", "Memory" ]
+      self.lists = [
+               "Links", 
+               "PortMappings", 
+               "EntryPoint", 
+               "Command", 
+               "Environment", 
+               "MountPoints",
+               "VolumesFrom",
+               "DnsServers",
+               "DnsSearchDomains",
+               "ExtraHosts",
+               "DockerSecurityOptions",
+               "Ulimits"
+              ]
+      self.dicts = [ "LogConfiguration", "DockerLabels" ]
+      self.bools = ["DisableNetworking", "Privileged", "ReadonlyRootFilesystem", "Essential" ]
+      self.all_args = [(self.strings, str), (self.ints, int), (self.lists, list), (self.dicts, dict), (self.bools, bool)]
+      self.obj = {}
+      for list_, type_ in self.all_args:
+         self.obj.update({ arg : type_ for arg in list_ })
+      self.resource = Resource("pseudo_container_resource",{},self.obj, **kwargs) 
+    
+   def return_container(self):
+      return self.resource.object
       
+      
+
+def get_my_ip(block_size="/32"):
+   '''simple method to obtain external IP address'''
+   req = requests.get("http://icanhazip.com")
+   return str(req.text.split("\n")[0] + block_size)
+
