@@ -151,9 +151,9 @@ class ContainerDefinition(BaseHelper):
       return self.resource.object
       
       
-
 def get_my_ip(block_size="/32"):
    '''simple method to obtain external IP address'''
    req = requests.get("http://icanhazip.com")
    return str(req.text.split("\n")[0] + block_size)
+
 

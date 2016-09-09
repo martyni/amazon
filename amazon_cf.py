@@ -120,7 +120,7 @@ class Environment(object):
 
     def add_resource(self, name, _type, required, optional_keys, depends=None, outputs=None, **kwargs):
         '''Generic method for adding a resource to the Cloud formation template. Makes use of the Resource helper object'''
-        name = name.title().replace(" ", "")
+        name = name.replace(".", " ").title().replace(" ", "")
         if outputs:
            for output in outputs:
               target = self.cf_get_at(name, output)
@@ -561,4 +561,34 @@ class Environment(object):
                           optional,
                           DesiredCount=desired_count,
                           TaskDefinition=task_definition
+                          )
+ 
+    def add_record_set(self, name, _type="A", **kwargs):
+        required = {
+           "Name": str,
+           "Type": str
+        }
+        optional = {
+           "AliasTarget": dict,
+           "Comment": str,
+           "Failover": str,
+           "GeoLocation": dict,
+           "HealthCheckId": str,
+           "HostedZoneId": str,
+           "HostedZoneName": str,
+           "HostedZoneId": str,
+           "Region": str,
+           "ResourceRecords": list,
+           "RecordSets": list,
+           "SetIdentifier": str,
+           "TTL": str,
+           "Weight": str
+        }
+        self.add_resource(name,
+                          "AWS::Route53::RecordSet",
+                          required,
+                          optional,
+                          Name=name,
+                          Type=_type,
+                          **kwargs
                           )
