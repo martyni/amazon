@@ -36,7 +36,7 @@ class Resource(BaseHelper):
         return self.resource 
 
 class Listener(BaseHelper):
-   def __init__(self, instance_port, loadbalancer_port, policy_names=None, ssl_certificate_id=None, inst_protocol='TCP', lb_protocol='TCP'):
+   def __init__(self, loadbalancer_port, instance_port, policy_names=None, ssl_certificate_id=None, inst_protocol='TCP', lb_protocol='TCP'):
       self.instance_port = instance_port
       self.loadbalancer_port = loadbalancer_port
       self.policy_names = policy_names

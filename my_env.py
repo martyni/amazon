@@ -13,10 +13,11 @@ if __name__ == "__main__":
     # Manually created key called id_rsa in amazon console
     key_name = 'id_rsa'
     filename = 'file.json'
-    stack_name = 'test'
+    stack_name = 'testagain'
     server_size = "t2.micro"
     ami = "ami-64385917"
     container_name = "httpd"
+    ssl_cert = "arn:aws:acm:eu-west-1:526914317097:certificate/c162e6f8-3f40-4468-a03f-03f5c8d8ee63"
     container_kwargs = {
         "Name": "httpd",
                 "Image": container_name,
@@ -31,7 +32,13 @@ if __name__ == "__main__":
         "Memory": 128,
         "Essential": True
     }
-
+    healthcheck = {
+       "Target": "HTTP:80/",
+       "HealthyThreshold" : "2",
+       "UnhealthyThreshold" : "5",
+       "Interval" : "30",
+       "Timeout" : "5"
+    }
     my_ip = get_my_ip()
     my_env = Environment('my_env')
     my_env.add_vpc("VPC")
@@ -52,7 +59,8 @@ if __name__ == "__main__":
         "add third subnet", subnet="MyThirdSubnet")
     in_rules = SecurityGroupRules("SecurityGroupIngress")
     in_rules.add_rule("tcp", from_port=22, to_port=22, cidr_ip=my_ip)
-    in_rules.add_rule("tcp", from_port=80, to_port=80, cidr_ip="0.0.0.0/0")
+    in_rules.add_rule("tcp", from_port=443, to_port=443, cidr_ip="0.0.0.0/0",)
+    in_rules.add_rule("tcp", from_port=80, to_port=80, cidr_ip="0.0.0.0/0",)
     out_rules = SecurityGroupRules("SecurityGroupEgress")
     out_rules.add_rule("-1", cidr_ip="0.0.0.0/0")
     my_env.add_security_group(
@@ -70,12 +78,13 @@ if __name__ == "__main__":
         "logs:CreateLogStream",
         "logs:PutLogEvents"
     ])
-    my_env.add_role("MytUser", Policies=docker_user.policies)
+    my_env.add_role(stack_name + "role", Policies=docker_user.policies)
     my_env.add_instance_profile("My profile")
     my_env.add_launch_configuration(
         "my launch configuration", ami, server_size, KeyName=key_name, AssociatePublicIpAddress=True, IamInstanceProfile=my_env.cf_ref("MyProfile"))
-    listener_80 = Listener(80, 80)
-    my_env.add_loadbalancer("My Load Balancer", [listener_80.get_listener()])
+    l_80 = Listener(80, 80)
+    l_443 = Listener(443, 80, lb_protocol="HTTPS", inst_protocol="HTTP", ssl_certificate_id=ssl_cert)
+    my_env.add_loadbalancer("My Load Balancer", [l_80.get_listener(), l_443.get_listener()], Healthcheck=healthcheck)
     my_env.add_autoscaling_group("My Autoscaling Group", DesiredCapacity="1", LoadBalancerNames=[
                                  my_env.cf_ref("MyLoadBalancer")])
     my_container = ContainerDefinition(**container_kwargs)
