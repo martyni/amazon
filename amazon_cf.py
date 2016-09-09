@@ -79,6 +79,10 @@ class Environment(object):
     def cf_ref(self, key):
         '''Cloudformation referential function'''
         return {"Ref": key}
+    
+    def cf_get_at(self, resource, attribute):
+        '''Cloudformation get at function'''
+        return { "Fn::GetAtt" : [resource, attribute] }
 
     def cf_designer(self, _id, source, target):
         '''Implements the Cloudformation Designer. This was used for debugging and hasn't been fully implemented'''
@@ -102,14 +106,25 @@ class Environment(object):
 
     def add_outputs(self, name, description='', target=None):
         '''Method to add output for resource'''
-        self.env["Outputs"][name] = {
-            "Value": self.cf_ref(name),
-            "Description": description
-        }
+        if not target:
+           self.env["Outputs"][name] = {
+               "Value": self.cf_ref(name),
+               "Description": description
+           }
+        else:
+           self.env["Outputs"][name] = {
+               "Value": target,
+               "Description": description
+           }
+          
 
-    def add_resource(self, name, _type, required, optional_keys, depends=None, **kwargs):
+    def add_resource(self, name, _type, required, optional_keys, depends=None, outputs=None, **kwargs):
         '''Generic method for adding a resource to the Cloud formation template. Makes use of the Resource helper object'''
         name = name.title().replace(" ", "")
+        if outputs:
+           for output in outputs:
+              target = self.cf_get_at(name, output)
+              self.add_outputs(name + output, target=target)
         self.add_outputs(name)
         if _type == "AWS::AutoScaling::AutoScalingGroup":
             temp_resource = Resource(_type,
@@ -387,6 +402,7 @@ class Environment(object):
                           Listeners=listeners,
                           CrossZone=cross_zone,
                           depends=[vpc] + self.get_all("AWS::EC2::Subnet"),
+                          outputs=["DNSName"],
                           SecurityGroups=security_groups,
                           Subnets=subnets)
 
