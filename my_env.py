@@ -13,7 +13,7 @@ if __name__ == "__main__":
     # Manually created items and constants
     key_name = 'id_rsa'
     filename = 'file.json'
-    stack_name = 'test'
+    stack_name = 'dev'
     server_size = "t2.micro"
     ami = "ami-64385917"
     container_name = "httpd"
@@ -36,11 +36,11 @@ if __name__ == "__main__":
     }
     #Healthcheck config
     healthcheck = {
-       "Target": "HTTP:80/",
-       "HealthyThreshold" : "2",
-       "UnhealthyThreshold" : "5",
-       "Interval" : "30",
-       "Timeout" : "5"
+        "HealthyThreshold": 2,
+        "Interval": 10,
+        "Target": "HTTP:80/",
+        "Timeout": 5,
+        "UnhealthyThreshold": 10
     }
     my_ip = get_my_ip()
     my_env = Environment('my_env')
