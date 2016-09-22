@@ -395,6 +395,8 @@ class Environment(object):
             "Subnets": list,
             "Tags": list
         }
+        if "HealthCheck" in kwargs:
+           print kwargs["HealthCheck"]
         self.add_resource(name,
                           "AWS::ElasticLoadBalancing::LoadBalancer",
                           required,
@@ -404,7 +406,8 @@ class Environment(object):
                           depends=[vpc] + self.get_all("AWS::EC2::Subnet"),
                           outputs=["DNSName"],
                           SecurityGroups=security_groups,
-                          Subnets=subnets)
+                          Subnets=subnets,
+                          **kwargs)
 
     def add_autoscaling_group(self, name, max_size="1", min_size="0", subnets=None, instance=None, launch_config=None, **kwargs):
         subnets = [self.cf_ref(s) for s in self.get_all(

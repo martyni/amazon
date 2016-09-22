@@ -15,6 +15,8 @@ class Resource(BaseHelper):
         for key in self.keys["Required"]:
             self.keys["All"][key] = self.keys["Required"][key]
         self.object = {}
+        if _type == "AWS::ElasticLoadBalancing::LoadBalancer":
+           print kwargs
         if kwargs:
             for key in self.keys["Required"]:
                 if key not in kwargs:
@@ -25,7 +27,7 @@ class Resource(BaseHelper):
                    self.object[key] = kwargs[key] if type(kwargs[key]) == self.keys["All"][key] else self.exception('')
                 except BaseException:
                    try:
-                      if kwargs[key].get("Ref"):
+                      if kwargs[key]["Ref"]:
                          self.object[key] = kwargs[key]
                    except:
                       self.exception(

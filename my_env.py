@@ -38,7 +38,7 @@ if __name__ == "__main__":
     healthcheck = {
         "HealthyThreshold": 2,
         "Interval": 10,
-        "Target": "HTTP:80/",
+        "Target": "HTTP:80/index.html",
         "Timeout": 5,
         "UnhealthyThreshold": 10
     }
