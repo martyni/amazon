@@ -159,6 +159,9 @@ def get_my_ip(block_size="/32"):
    req = requests.get("http://icanhazip.com")
    return str(req.text.split("\n")[0] + block_size)
 
-def get_environment_variables(vars_list):
+def convert_to_aws(**kwargs):
+   return [ {"Name": var, "Value": kwargs[var] } for var in kwargs ]
+ 
+def get_local_variables(vars_list):
    '''Environment variable list pulled from local environment variables'''
-   return [ {"Name": var, "Value": os.environ[var] } for var in vars_list]
+   return  convert_to_aws(**{ var : os.environ[var]  for var in vars_list })

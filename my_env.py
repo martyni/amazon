@@ -37,7 +37,7 @@ if __name__ == "__main__":
                 "Image": app_container,
                 "Cpu": container_size,
         "Memory": container_size,
-        "Environment": get_environment_variables(environment_variables),
+        "Environment": get_local_variable(environment_variables),
         "Essential": True
     }
     nginx_container = {
@@ -52,6 +52,7 @@ if __name__ == "__main__":
                     }
                 ],
         "Memory": container_size,
+        "Environment": convert_to_aws(SITE=stack_name + "." + domain}
         "Links": ["app"],
         "Essential": True
     }
