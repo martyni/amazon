@@ -164,4 +164,4 @@ def convert_to_aws_list(**kwargs):
  
 def get_local_variables(vars_list):
    '''Environment variable list pulled from local environment variables'''
-   return  convert_to_aws(**{ var : os.environ[var]  for var in vars_list })
+   return  convert_to_aws_list(**{ var : os.environ[var]  for var in vars_list })
