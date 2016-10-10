@@ -6,7 +6,8 @@ from helper import (
     SecurityGroupRules,
     UserPolicy,
     get_my_ip,
-    get_environment_variables,
+    get_local_variables,
+    convert_to_aws_list,
     ContainerDefinition
 )
 

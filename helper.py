@@ -159,7 +159,7 @@ def get_my_ip(block_size="/32"):
    req = requests.get("http://icanhazip.com")
    return str(req.text.split("\n")[0] + block_size)
 
-def convert_to_aws(**kwargs):
+def convert_to_aws_list(**kwargs):
    return [ {"Name": var, "Value": kwargs[var] } for var in kwargs ]
  
 def get_local_variables(vars_list):
