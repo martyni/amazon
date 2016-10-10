@@ -38,7 +38,7 @@ if __name__ == "__main__":
                 "Image": app_container,
                 "Cpu": container_size,
         "Memory": container_size,
-        "Environment": get_local_variable(environment_variables),
+        "Environment": get_local_variables(environment_variables),
         "Essential": True
     }
     nginx_container = {
