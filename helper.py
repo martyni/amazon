@@ -1,4 +1,5 @@
 import requests
+import os
 
 class BaseHelper(object):
     def exception(self, problem):
@@ -158,4 +159,6 @@ def get_my_ip(block_size="/32"):
    req = requests.get("http://icanhazip.com")
    return str(req.text.split("\n")[0] + block_size)
 
-
+def get_environment_variables(vars_list):
+   '''Environment variable list pulled from local environment variables'''
+   return [ {"Name": var, "Value": os.environ[var] } for var in vars_list]

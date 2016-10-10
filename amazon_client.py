@@ -7,7 +7,7 @@ from pprint import pprint
 from fabric.api import local
 
 if 'martyn' in os.environ.get('VIRTUAL_ENV', ''):
-    boto3 = boto3.Session(profile_name='martyn')
+    boto3 = boto3.Session(profile_name='martyn', region_name='eu-west-1')
 
 
 def random_str(size=6, chars=string.ascii_lowercase):

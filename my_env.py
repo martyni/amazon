@@ -6,6 +6,7 @@ from helper import (
     SecurityGroupRules,
     UserPolicy,
     get_my_ip,
+    get_environment_variables,
     ContainerDefinition
 )
 
@@ -16,14 +17,33 @@ if __name__ == "__main__":
     stack_name = 'dev'
     server_size = "t2.micro"
     ami = "ami-64385917"
-    container_name = "httpd"
+    app_container = "martyni/app"
+    nginx_container = "martyni/nginx"
     domain = "martyni.co.uk."
     ssl_cert = "arn:aws:acm:eu-west-1:526914317097:certificate/c162e6f8-3f40-4468-a03f-03f5c8d8ee63"
-    #Container configuration
-    container_kwargs = {
-        "Name": "httpd",
-                "Image": container_name,
-                "Cpu": 1,
+    container_size = 450
+    environment_variables = [
+        "AWS_DEFAULT_PROFILE",
+        "MAIL_USERNAME",
+        "MAIL_PASSWORD",
+        "MAIL_DEFAULT_SENDER",
+        "MAIL_SERVER",
+        "MAIL_PORT",
+        "MAIL_USE_SSL"
+    ]
+    # Container configuration
+    app_container = {
+        "Name": "app",
+                "Image": app_container,
+                "Cpu": container_size,
+        "Memory": container_size,
+        "Environment": get_environment_variables(environment_variables),
+        "Essential": True
+    }
+    nginx_container = {
+        "Name": "nginx",
+                "Image": nginx_container,
+                "Cpu": container_size,
                 "PortMappings": [
                     {
                         "Protocol": "tcp",
@@ -31,14 +51,15 @@ if __name__ == "__main__":
                         "HostPort": 80
                     }
                 ],
-        "Memory": 128,
+        "Memory": container_size,
+        "Links": ["app"],
         "Essential": True
     }
-    #Healthcheck config
+    # Healthcheck config
     healthcheck = {
         "HealthyThreshold": 2,
         "Interval": 10,
-        "Target": "HTTP:80/index.html",
+        "Target": "HTTP:80/",
         "Timeout": 5,
         "UnhealthyThreshold": 10
     }
@@ -84,38 +105,42 @@ if __name__ == "__main__":
     my_env.add_role(stack_name + "role", Policies=docker_user.policies)
     my_env.add_instance_profile("My profile")
     my_env.add_launch_configuration(
-        "my launch configuration", 
-        ami, 
-        server_size, 
-        KeyName=key_name, 
-        AssociatePublicIpAddress=True, 
+        "my launch configuration",
+        ami,
+        server_size,
+        KeyName=key_name,
+        AssociatePublicIpAddress=True,
         IamInstanceProfile=my_env.cf_ref("MyProfile")
-        )
-    l_80 = Listener(80, 80)
+    )
     l_443 = Listener(
-        443, 
-        80, 
-        lb_protocol="HTTPS", 
-        inst_protocol="HTTP", 
+        443,
+        80,
+        lb_protocol="HTTPS",
+        inst_protocol="HTTP",
         ssl_certificate_id=ssl_cert
-        )
+    )
     my_env.add_loadbalancer(
-        "My Load Balancer", 
-        [l_80.get_listener(), l_443.get_listener()], 
+        "My Load Balancer",
+        [l_443.get_listener()],
         HealthCheck=healthcheck)
     my_env.add_autoscaling_group("My Autoscaling Group", DesiredCapacity="1", LoadBalancerNames=[
                                  my_env.cf_ref("MyLoadBalancer")])
-    my_container = ContainerDefinition(**container_kwargs)
-    my_env.add_ecs_task('web service', container_definitions=[
-                        my_container.return_container()])
+    app_container = ContainerDefinition(**app_container)
+    nginx_container = ContainerDefinition(**nginx_container)
+    my_env.add_ecs_task('web service',
+                        container_definitions=[
+                            app_container.return_container(),
+                            nginx_container.return_container()
+                        ]
+                        )
     my_env.add_ecs_service('web service running')
     resource_record = [my_env.cf_get_at("MyLoadBalancer", "DNSName")]
     my_env.add_record_set(
-        stack_name + "." + domain, 
+        stack_name + "." + domain,
         _type="CNAME",
-        depends=["MyLoadBalancer"], 
-        HostedZoneName=domain, 
-        TTL="300", 
+        depends=["MyLoadBalancer"],
+        HostedZoneName=domain,
+        TTL="300",
         ResourceRecords=resource_record
     )
     # Launch stack
