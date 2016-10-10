@@ -53,7 +53,7 @@ if __name__ == "__main__":
                     }
                 ],
         "Memory": container_size,
-        "Environment": convert_to_aws(SITE=stack_name + "." + domain}
+        "Environment": convert_to_aws(SITE=stack_name + "." + domain)
         "Links": ["app"],
         "Essential": True
     }
