@@ -53,7 +53,9 @@ if __name__ == "__main__":
                     }
                 ],
         "Memory": container_size,
-        "Environment": convert_to_aws_list(SITE=stack_name + "." + domain),
+        "Environment": convert_to_aws_list(REQUEST_STRING="$host$request_uri",
+           SITE=stack_name + "." + domain[:-1:]
+        ),
         "Links": ["app"],
         "Essential": True
     }
